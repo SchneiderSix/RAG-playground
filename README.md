@@ -1,3 +1,3 @@
-## Taks
+## To do list
 
--[] Self-RAG
+- [ ] Self-RAG
