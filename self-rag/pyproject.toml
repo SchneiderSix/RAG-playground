@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "self-rag"
+version = "0.1.0"
+description = "Self-RAG (Self-Reflective Retrieval-Augmented Generation) is a framework designed to improve the quality and factual accuracy of large language models (LLMs). Unlike traditional RAG methods that simply retrieve and use documents, Self-RAG enhances LLMs by adding a self-reflection mechanism. This approach allows the model to generate responses and then review and refine those responses based on the retrieved information. Self-RAG uses reflection tokens to guide the model in checking its own outputs for acc"
+authors = ["SchneiderSix <104461916+SchneiderSix@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pymongo = "^4.8.0"
+python-dotenv = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
