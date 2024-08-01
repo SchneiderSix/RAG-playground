@@ -21,7 +21,7 @@ db = client[DB_NAME]
 MONGODB_COLLECTION = db[COLLECTION_NAME]
 
 
-def storeDocuments():
+def store_documents():
     # Load docs
     loader = PyPDFDirectoryLoader('documents/')
     data = loader.load()
@@ -37,5 +37,24 @@ def storeDocuments():
     )
 
 
+def get_documents(query):
+    # Retrieve documents from vector store comparing query's vector
+    results = MONGODB_COLLECTION.aggregate([
+        {
+            '$vectorSearch': {
+                'index': 'vector_index',
+                'queryVector': OpenAIEmbeddings().embed_query(query),
+                'numCandidates': 200,
+                'limit': 20,
+                'path': 'embedding'
+            }
+        }
+    ])
+
+    for i in results:
+        print(i)
+
+
 if __name__ == '__main__':
-    storeDocuments()
+    # store_documents()
+    get_documents('napoleon')
