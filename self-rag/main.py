@@ -70,11 +70,14 @@ def get_documents(query):
         print(i)
 
 
-def get_retriever(chunk_limit):
+def get_retriever(chunk_limit=200):
     """Get retriever in langchain format from vector store
 
     Args:
         chunk_limit (int): Number of chunks to be retrieved
+
+    Returns:
+        Retriever: Retriever from Atlas Vector Search
     """
     vector_search = MongoDBAtlasVectorSearch.from_connection_string(
         os.environ['MONGO_URI'],
@@ -129,7 +132,7 @@ def routing_chain(query):
     routing_human_message_prompt = HumanMessagePromptTemplate.from_template(
         routing_human_template)
 
-    # Combine prompts
+    # Combined prompts
     chat_prompt = ChatPromptTemplate.from_messages(
         [routing_system_message_prompt, routing_human_message_prompt]
     )
@@ -144,7 +147,66 @@ def routing_chain(query):
         {"question": query, "format_instructions": routing_format_instructions}))
 
 
+class GradeDocuments(BaseModel):
+    """
+    Boolean assignation for retrieved documents
+    """
+    score: Literal["true", "false"] = Field(
+        description="Documents relevant to question")
+
+
+def relevance_chain(query):
+    """Generate relevance chain to get relevant documents
+
+    Args:
+        query (string): Sentence to be used in prompt
+    """
+
+    # Define model
+    llm = OpenAI()
+
+    # Output parser
+    relevance_parser = PydanticOutputParser(pydantic_object=GradeDocuments)
+
+    # System prompt, instructions to answer true | false
+    relevance_system_template = """You are a grader assessing relevance of a retrieved document to a user question.
+    If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant.
+    Give a boolean score 'true' or 'false' score to indicate whether the document is relevant to the question."""
+
+    relevance_system_message_prompt = SystemMessagePromptTemplate.from_template(
+        relevance_system_template)
+
+    # Human prompt
+    relevance_human_template = "Retrieved document: \n\n {document} \n\n User question: {question}\n\n{format_instructions}"
+    relevance_human_message_prompt = HumanMessagePromptTemplate.from_template(
+        relevance_human_template)
+
+    # Combined prompts
+    chat_prompt = ChatPromptTemplate.from_messages(
+        [relevance_system_message_prompt, relevance_human_message_prompt]
+    )
+
+    # Pass instructions
+    retrieval_format_instructions = relevance_parser.get_format_instructions()
+
+    # Create chain
+    retrieval_grader_relevance = chat_prompt | llm | relevance_parser
+
+    # Get documents
+    docs_from_retriever = get_retriever().invoke(query)
+    doc_txt = docs_from_retriever[0].page_content
+
+    result = retrieval_grader_relevance.invoke({
+        "question": query,
+        "document": doc_txt,
+        "format_instructions": retrieval_format_instructions
+    })
+
+    print(result)
+
+
 if __name__ == '__main__':
     # store_documents()
     # get_documents('napoleon')
-    routing_chain('what do you know about black holes?')
+    # routing_chain('what do you know about black holes?')
+    relevance_chain("what do you know about black holes")
