@@ -7,13 +7,17 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.13"
 pymongo = "^4.8.0"
 python-dotenv = "^1.0.1"
 langchain = "^0.2.11"
 langchain-community = "^0.2.10"
 pypdf = "^4.3.1"
 langchain-openai = "^0.1.19"
+langchain-unstructured = "^0.1.1"
+unstructured = {extras = ["pdf"], version = "^0.15.1"}
+python-magic = "^0.4.27"
+python-magic-bin = "^0.4.14"
 
 
 [build-system]

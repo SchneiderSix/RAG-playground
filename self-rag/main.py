@@ -6,6 +6,7 @@ from langchain.llms import OpenAI
 from langchain_openai import ChatOpenAI
 from langchain.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_unstructured import UnstructuredLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain.vectorstores import MongoDBAtlasVectorSearch
 from langchain_core.prompts import (
@@ -42,14 +43,28 @@ def store_documents():
     """
     Load docs from folder and generate chunks from docs
     """
-    loader = PyPDFDirectoryLoader('documents/')
-    data = loader.load()
+    # Delete documents from collection
+    MONGODB_COLLECTION.delete_many({})
+    # loader = PyPDFDirectoryLoader('documents/')
+    # data = loader.load()
 
     # Generate chunks from docs
     # chunk_sizes = [128, 256, 512, 1024, 2048]
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=128, chunk_overlap=20)
-    docs = text_splitter.split_documents(data)
+    # text_splitter = RecursiveCharacterTextSplitter(
+    #    chunk_size=128, chunk_overlap=20)
+    # docs = text_splitter.split_documents(data)
+
+    docs_path = [
+        "documents/0905.3243v2.pdf",
+        "documents/1103.2064v2.pdf",
+        "documents/1209.2243v1.pdf",
+        "documents/1702.07766v2.pdf",
+        "documents/81517305.pdf"
+    ]
+
+    loader = UnstructuredLoader(
+        docs_path, strategy="auto", chunking_strategy="basic")
+    docs = loader.load()
 
     # Store documents in MongoDB Atlas Vector Search
     x = MongoDBAtlasVectorSearch.from_documents(
@@ -327,10 +342,10 @@ def grader_hallucination_chain(query):
 
 
 if __name__ == '__main__':
-    # store_documents()
+    store_documents()
     # get_documents('napoleon')
-    # print(context_chain("what are black holes?"))
+    print(context_chain("what are black holes?"))
     # print(len(get_retriever().invoke("what are black holes?")))
     # routing_chain('what do you know about black holes?')
     # relevance_chain("what do you know about black holes?")
-    grader_hallucination_chain("what do you know about black holes?")
+    # grader_hallucination_chain("what do you know about black holes?")
