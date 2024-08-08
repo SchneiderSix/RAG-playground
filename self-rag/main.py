@@ -38,6 +38,9 @@ client = MongoClient(os.environ['MONGO_URI'])
 db = client[DB_NAME]
 MONGODB_COLLECTION = db[COLLECTION_NAME]
 
+# Docs topic
+DOCS_TOPIC = "black holes"
+
 
 def store_documents():
     """
@@ -72,26 +75,27 @@ def store_documents():
     )
 
 
-def get_documents(query):
+def get_documents(query, limit=20):
     """Retrieve documents from vector store comparing query's vector
 
     Args:
         query (string): Sentence to be vetorized and compared in atlas vector search
+
+    Returns:
+        docs_metadata (list): Results from avs
     """
-    results = MONGODB_COLLECTION.aggregate([
+    results = list(MONGODB_COLLECTION.aggregate([
         {
             '$vectorSearch': {
                 'index': 'vector_index',
                 'queryVector': OpenAIEmbeddings().embed_query(query),
                 'numCandidates': 200,
-                'limit': 20,
+                'limit': limit,
                 'path': 'embedding'
             }
         }
-    ])
-
-    for i in results:
-        print(i)
+    ]))
+    return results
 
 
 def get_retriever(most_relevant_docs=200):
@@ -126,6 +130,9 @@ def context_chain(query):
 
     Args:
         query (string): Sentence to be used in prompt
+
+    Returns:
+        answer (string): From context chain
     """
 
     # Define model
@@ -163,7 +170,6 @@ def context_chain(query):
         retriever=get_retriever(),
         memory=memory
     )
-
     return chain({"question": query})["answer"]
 
 
@@ -191,8 +197,8 @@ def routing_chain(query):
     routing_parser = PydanticOutputParser(pydantic_object=RouteQuery)
 
     # Prompts for system and human, specify topic of documents
-    routing_system_template = """You are an expert at routing a user question to a vectorstore or websearch.
-    The vectorstore contains documents related to black holes.
+    routing_system_template = f"""You are an expert at routing a user question to a vectorstore or websearch.
+    The vectorstore contains documents related to {DOCS_TOPIC}.
     Use the vectorstore for questions on these topics. For all else, use websearch."""
 
     routing_system_message_prompt = SystemMessagePromptTemplate.from_template(
@@ -263,13 +269,13 @@ def relevance_chain(query):
     # Create chain
     chain = chat_prompt | llm | relevance_parser
 
-    # Get documents
-    docs_from_retriever = get_retriever().invoke(query)
-    doc_txt = docs_from_retriever[0].page_content
+    # Get documents from vector store related to query
+    dc = get_documents(query)
+    dc = ([str(x["text"]) for x in dc])
 
     result = chain.invoke({
         "question": query,
-        "document": doc_txt,
+        "document": dc,
         "format_instructions": retrieval_format_instructions
     })
 
@@ -322,18 +328,15 @@ def grader_hallucination_chain(query):
     # Chain
     chain = grader_hallucination_chat_prompt | llm | grader_hallucination_parser
 
-    # Get documents
-    docs_from_retriever = get_retriever().invoke(query)
-
-    # Parse every document
-    docs_txt = "".join(["document: " + x.metadata["source"] + ", page: " +
-                        str(x.metadata["page"]) + ", content: " + x.page_content for x in docs_from_retriever])
+    # Get documents from vector store related to query
+    dc = get_documents(query)
+    dc = ([str(x["text"]) for x in dc])
 
     # Get answer from context_chain
     ac = context_chain(query)
 
     result = chain.invoke({
-        "documents": str(docs_txt),
+        "documents": dc,
         "generation": ac,
         "format_instructions": grader_hallucination_format_instructions
     })
@@ -341,11 +344,74 @@ def grader_hallucination_chain(query):
     print(result)
 
 
+class GradeAnswer(BaseModel):
+    """Boolean grade if the question was answered right
+    """
+    answered: Literal["true", "false"] = Field(
+        ...,
+        description="Answer addresses the question, 'true' or 'false'"
+    )
+
+
+def grader_answer_chain(query):
+    """Chain to check if the answer corresponds to the question
+
+    Args:
+        query (string): Sentence to be used in prompt
+    """
+
+    # Define model
+    llm = OpenAI()
+
+    # Output parser
+    grader_answer_parser = PydanticOutputParser(
+        pydantic_object=GradeAnswer
+    )
+
+    # System prompt
+    grader_answer_system_template = """You are a grader assessing whether an answer addresses / resolves a question.
+    Give a binary score 'true' or 'false'. 'true' means that the answer resolves the question."""
+
+    grader_answer_system_message_prompt = SystemMessagePromptTemplate.from_template(
+        grader_answer_system_template
+    )
+
+    # Human prompt
+    grader_answer_human_template = "User question: \n\n {question} \n\n LLM generation: {generation}\n\n{format_instructions}"
+    grader_answer_human_message_prompt = HumanMessagePromptTemplate.from_template(
+        grader_answer_human_template
+    )
+
+    # Combined prompts
+    grader_answer_chat_prompt = ChatPromptTemplate.from_messages(
+        [grader_answer_system_message_prompt,
+         grader_answer_human_message_prompt]
+    )
+
+    # Pass instructions
+    grader_answer_format_instructions = grader_answer_parser.get_format_instructions()
+
+    # Chain
+    chain = grader_answer_chat_prompt | llm | grader_answer_parser
+
+    # Get answer from context_chain
+    ac = context_chain(query)
+
+    result = chain.invoke({
+        "question": query,
+        "generation": ac,
+        "format_instructions": grader_answer_format_instructions
+    })
+
+    print(result)
+
+
 if __name__ == '__main__':
-    store_documents()
+    # store_documents()
     # get_documents('napoleon')
-    print(context_chain("what are black holes?"))
+    # print(context_chain("what are black holes?"))
     # print(len(get_retriever().invoke("what are black holes?")))
     # routing_chain('what do you know about black holes?')
     # relevance_chain("what do you know about black holes?")
     # grader_hallucination_chain("what do you know about black holes?")
+    grader_answer_chain("tell me something about black holes")
