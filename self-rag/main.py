@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 from typing import Literal
 from pymongo import MongoClient
@@ -22,6 +23,9 @@ from langchain.output_parsers import (
 )
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain_community.tools import DuckDuckGoSearchResults
+from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+from langchain.schema import Document
 
 
 # Load keys from env
@@ -405,6 +409,33 @@ def grader_answer_chain(query):
     print(result)
 
 
+def web_documents(query, limit=5):
+    """Check on the web for answers
+
+    Args:
+        query (string): Sentence to be used in prompt
+
+    Returns:
+        string []: Documents
+    """
+    duck_wraper = DuckDuckGoSearchAPIWrapper(max_results=limit)
+    duck = DuckDuckGoSearchResults(api_wrapper=duck_wraper)
+    docs = duck.invoke(query)
+    result = Document(page_content=docs)
+
+    # Regular expression to match snippet, title, and link
+    pattern = r"\[snippet: (.*?), title: (.*?), link: (.*?)\]"
+
+    # Extract all matches
+    matches = re.findall(pattern, result.page_content)
+
+    # Convert matches into a list of dictionaries
+    result = [{"snippet": match[0], "title": match[1], "link": match[2]}
+              for match in matches]
+    for i in result:
+        print(i)
+
+
 if __name__ == '__main__':
     # store_documents()
     # get_documents('napoleon')
@@ -413,4 +444,5 @@ if __name__ == '__main__':
     # routing_chain('what do you know about black holes?')
     # relevance_chain("what do you know about black holes?")
     # grader_hallucination_chain("what do you know about black holes?")
-    grader_answer_chain("tell me something about black holes")
+    # grader_answer_chain("tell me something about black holes")
+    web_documents("What kind of black holes exist?")
