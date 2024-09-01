@@ -348,8 +348,7 @@ class GradeAnswer(BaseModel):
     """Boolean grade if the question was answered right
     """
     answered: Literal["true", "false"] = Field(
-        ...,
-        description="Answer addresses the question, 'true' or 'false'"
+        ..., description="Answer addresses the question, 'true' or 'false'"
     )
 
 
@@ -369,8 +368,8 @@ def grader_answer_chain(query):
     )
 
     # System prompt
-    grader_answer_system_template = """You are a grader assessing whether an answer addresses / resolves a question.
-    Give a binary score 'true' or 'false'. 'true' means that the answer resolves the question."""
+    grader_answer_system_template = """You are a grader assessing whether a LLM generation addresses / resolves a question.
+    Give a binary score 'true' or 'false'. 'true' means that the answer resolves the question. Your answer must be in json format"""  # Force answer to be in json format
 
     grader_answer_system_message_prompt = SystemMessagePromptTemplate.from_template(
         grader_answer_system_template
